@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Azure OpenAI Chat</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chat-container {
+            height: calc(100vh - 240px);
+            scroll-behavior: smooth;
+        }
+        .message {
+            max-width: 85%;
+            margin: 12px 8px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            opacity: 0;
+            transform: translateY(10px);
+            animation: messageAppear 0.3s ease forwards;
+        }
+        @keyframes messageAppear {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .user-message {
+            background-color: #f3f4f6;
+            margin-left: auto;
+            border-bottom-right-radius: 4px;
+        }
+        .assistant-message {
+            background-color: #3b82f6;
+            background-image: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            margin-right: auto;
+            border-bottom-left-radius: 4px;
+        }
+        .custom-input {
+            transition: all 0.2s ease;
+        }
+        .custom-input:focus {
+            transform: translateY(-1px);
+        }
+        .custom-button {
+            transition: all 0.2s ease;
+        }
+        .custom-button:hover {
+            transform: translateY(-1px);
+        }
+        .custom-button:active {
+            transform: translateY(0);
+        }
+        .typing-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 12px;
+            background-color: #f3f4f6;
+            border-radius: 12px;
+            margin: 8px;
+        }
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            background-color: #6b7280;
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+        .typing-dot:nth-child(1) { animation-delay: 0s; }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typing {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <div class="bg-white rounded-xl shadow-lg p-6 space-y-6">
+            <!-- Header -->
+            <div class="text-center mb-8">
+                <h1 class="text-2xl font-semibold text-gray-800">Azure OpenAI Chat</h1>
+                <p class="text-gray-600 mt-2">Your intelligent conversation partner</p>
+            </div>
+
+            <!-- Config Panel -->
+            <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <div></div>
+                        <button onclick="toggleConfig()" class="text-blue-600 hover:text-blue-700 focus:outline-none flex items-center gap-2">
+                            <span id="configToggleText">Show Config</span>
+                            <svg id="configArrow" class="w-4 h-4 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        </button>
+                    </div>
+                <div id="configPanel" class="hidden space-y-4">
+                <h2 class="text-lg font-semibold mb-4">Configuration</h2>
+                
+                <!-- Username Input -->
+                <div class="mb-4">
+                    <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                    <input type="text" id="username" placeholder="Enter your username" 
+                           class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 mb-2 p-3">
+                </div>
+
+                <!-- API Key Input -->  
+                <div class="mb-4">
+                    <label for="api-key" class="block text-sm font-medium text-gray-700 mb-1">API Key</label>
+                    <input type="password" id="api-key" 
+                        class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 mb-2 p-3"
+                        placeholder="Enter your API key">
+                </div>
+                <!-- System Prompt -->
+                <div>
+                    <label for="system-prompt" class="block text-sm font-medium text-gray-700 mb-2">System Prompt</label>
+                    <textarea id="system-prompt" rows="3" 
+                        class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 custom-input p-3"
+                        placeholder="You are a helpful AI assistant..."></textarea>
+                </div>
+                <!-- LLM Parameters -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="temperature" class="block text-sm font-medium text-gray-700 mb-2">Temperature</label>
+                        <div class="flex items-center gap-2">
+                            <input type="range" id="temperature" min="0" max="2" step="0.1" value="0"
+                                class="flex-1" oninput="updateRangeValue('temperature')">
+                            <span id="temperature-value" class="text-sm text-gray-600 w-12">0</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="max-tokens" class="block text-sm font-medium text-gray-700 mb-2">Max Tokens</label>
+                        <input type="number" id="max-tokens" value="800" min="1" max="4000"
+                               class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 custom-input p-3">
+                    </div>
+                    <div>
+                        <label for="top-p" class="block text-sm font-medium text-gray-700 mb-2">Top P</label>
+                        <div class="flex items-center gap-2">
+                            <input type="range" id="top-p" min="0" max="1" step="0.05" value="0.95"
+                                class="flex-1" oninput="updateRangeValue('top-p')">
+                            <span id="top-p-value" class="text-sm text-gray-600 w-12">0.95</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="frequency-penalty" class="block text-sm font-medium text-gray-700 mb-2">Frequency Penalty</label>
+                        <div class="flex items-center gap-2">
+                            <input type="range" id="frequency-penalty" min="-2" max="2" step="0.1" value="0"
+                                class="flex-1" oninput="updateRangeValue('frequency-penalty')">
+                            <span id="frequency-penalty-value" class="text-sm text-gray-600 w-12">0</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="presence-penalty" class="block text-sm font-medium text-gray-700 mb-2">Presence Penalty</label>
+                        <div class="flex items-center gap-2">
+                            <input type="range" id="presence-penalty" min="-2" max="2" step="0.1" value="0"
+                                class="flex-1" oninput="updateRangeValue('presence-penalty')">
+                            <span id="presence-penalty-value" class="text-sm text-gray-600 w-12">0</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Save Configuration Button -->
+                <div class="flex justify-end mt-4">
+                    <button onclick="saveConfiguration()" 
+                            class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 custom-button">
+                        Save Configuration
+                    </button>
+                </div>
+            </div>
+
+            <!-- Chat History -->
+            <div id="chat-history" class="chat-container overflow-y-auto mb-6 border border-gray-200 rounded-lg p-4 bg-gray-50"></div>
+
+            <!-- Input Form -->
+            <div class="flex flex-col gap-3">
+                <textarea id="user-input" 
+                    placeholder="Type your message..." 
+                    class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 custom-input p-3 min-h-[100px] resize-y"
+                    style="resize: vertical;"
+                    rows="4"
+                    autocomplete="off"></textarea>
+                <div class="flex gap-2 justify-end">
+                    <button id="reset-button" 
+                            class="px-4 py-2.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 custom-button flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        <span>Start a new conversation</span>
+                    </button>
+                    <button id="clear-button" 
+                            class="px-4 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 custom-button flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        <span>Clear History</span>
+                    </button>
+                    <button id="send-button" 
+                            class="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 custom-button flex items-center gap-2">
+                        <span>Send</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add marked.js for markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        // Initialize marked.js with default options
+        marked.setOptions({
+            breaks: true,  // Enable line breaks
+            gfm: true,    // Enable GitHub Flavored Markdown
+            headerIds: false // Disable header IDs to prevent potential conflicts
+        });
+
+        // Cookie management functions
+        function setCookie(name, value, days) {
+            const d = new Date();
+            d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
+            const expires = "expires=" + d.toUTCString();
+            document.cookie = name + "=" + value + ";" + expires + ";path=/";
+        }
+
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return '';
+        }
+
+        // Initialize event listeners when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load saved configurations
+            const savedUsername = getCookie('username');
+            const savedApiKey = getCookie('apiKey');
+            
+            if (savedUsername) {
+                document.getElementById('username').value = savedUsername;
+                // Load chat history after setting username
+                loadChatHistory();
+            }
+            if (savedApiKey) {
+                document.getElementById('api-key').value = savedApiKey;
+            }
+
+            // Save username when changed
+            document.getElementById('username').addEventListener('change', function() {
+                setCookie('username', this.value, 30); // Save for 30 days
+            });
+
+            document.getElementById('api-key').addEventListener('change', function() {
+                setCookie('apiKey', this.value, 30); // Save for 30 days
+            });
+
+            // Bind click event to send button
+            document.getElementById('send-button').addEventListener('click', sendMessage);
+            
+            // Bind enter key to input field
+            document.getElementById('user-input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+
+            // Add keydown event for textarea
+            document.getElementById('user-input').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+
+            // Load chat history on page load
+            loadChatHistory();
+
+            // Add clear history button event
+            document.getElementById('clear-button').addEventListener('click', clearHistory);
+            
+            // Add reset button event
+            document.getElementById('reset-button').addEventListener('click', resetConversation);
+
+            // Initialize session messages array
+            window.sessionMessages = [];
+        });
+
+        function toggleConfig() {
+            const configPanel = document.getElementById('configPanel');
+            const configArrow = document.getElementById('configArrow');
+            const configToggleText = document.getElementById('configToggleText');
+            
+            if (configPanel.classList.contains('hidden')) {
+                configPanel.classList.remove('hidden');
+                configArrow.classList.add('rotate-180');
+                configToggleText.textContent = 'Hide Config';
+            } else {
+                configPanel.classList.add('hidden');
+                configArrow.classList.remove('rotate-180');
+                configToggleText.textContent = 'Show Config';
+            }
+        }
+
+        function updateRangeValue(id) {
+            const input = document.getElementById(id);
+            const valueSpan = document.getElementById(`${id}-value`);
+            valueSpan.textContent = input.value;
+        }
+
+        function saveConfig() {
+            const config = {
+                systemPrompt: document.getElementById('system-prompt').value,
+                temperature: parseFloat(document.getElementById('temperature').value),
+                maxTokens: parseInt(document.getElementById('max-tokens').value),
+                topP: parseFloat(document.getElementById('top-p').value),
+                frequencyPenalty: parseFloat(document.getElementById('frequency-penalty').value),
+                presencePenalty: parseFloat(document.getElementById('presence-penalty').value)
+            };
+            
+            localStorage.setItem('chatConfig', JSON.stringify(config));
+            alert('Configuration saved successfully!');
+        }
+
+        function saveApiKey() {
+            const apiKey = document.getElementById('api-key').value;
+            setCookie('azure_api_key', apiKey, 7); // Save for 7 days
+            alert('API key saved successfully!');
+        }
+
+        function setCookie(name, value, days) {
+            const expires = new Date();
+            expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+            document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+        }
+
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+        }
+
+        async function clearHistory() {
+            const username = document.getElementById('username').value;
+            if (!username) {
+                alert('Please set your username first');
+                return;
+            }
+
+            if (!confirm('Are you sure you want to clear all chat history? This cannot be undone.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/clear_history', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username: username })
+                });
+                
+                if (response.ok) {
+                    document.getElementById('chat-history').innerHTML = '';
+                } else {
+                    const data = await response.json();
+                    alert('Failed to clear history: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error clearing history:', error);
+                alert('Failed to clear history: ' + error.message);
+            }
+        }
+
+        function resetConversation() {
+            const separator = document.createElement('div');
+            separator.className = 'border-t-2 border-gray-300 my-4 relative';
+            separator.innerHTML = `
+                <span class="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white px-4 text-sm text-gray-500">
+                    New Conversation
+                </span>
+            `;
+            document.getElementById('chat-history').appendChild(separator);
+            currentConversationId = generateUUID();
+            scrollToBottom();
+        }
+
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16 | 0,
+                    v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        async function loadChatHistory() {
+            const username = document.getElementById('username').value;
+            if (!username) return;
+
+            fetch('/api/history?username=' + encodeURIComponent(username))
+                .then(response => response.json())
+                .then(data => {
+                    const chatBox = document.getElementById('chat-history');
+                    chatBox.innerHTML = ''; // Clear existing messages
+                    
+                    if (data.messages && data.messages.length > 0) {
+                        let lastConvId = null;
+                        
+                        data.messages.forEach(msg => {
+                            if (lastConvId && msg.conversation_id !== lastConvId) {
+                                // Add separator between conversations
+                                const separator = document.createElement('div');
+                                separator.className = 'border-t-2 border-gray-300 my-4 relative';
+                                separator.innerHTML = `
+                                    <span class="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white px-4 text-sm text-gray-500">
+                                        New Conversation
+                                    </span>
+                                `;
+                                chatBox.appendChild(separator);
+                            }
+                            appendMessage(msg.role, msg.content, msg.timestamp);
+                            lastConvId = msg.conversation_id;
+                        });
+                        
+                        // Set current conversation ID to the last one
+                        currentConversationId = lastConvId;
+                        scrollToBottom();
+                    } else {
+                        // If no messages, start a new conversation
+                        currentConversationId = generateUUID();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading chat history:', error);
+                    currentConversationId = generateUUID();
+                });
+        }
+
+        function appendMessage(role, content, timestamp) {
+            const chatBox = document.getElementById('chat-history');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'mb-2'; // Even smaller margin between messages
+            
+            const roleClass = role === 'user' ? 'bg-blue-100' : 'bg-gray-100';
+            const alignClass = role === 'user' ? 'ml-auto' : 'mr-auto';
+            const maxWidth = 'max-w-[80%]';
+            const username = role === 'user' ? document.getElementById('username').value : 'Assistant';
+            
+            // Ensure we have a valid timestamp
+            const messageTime = timestamp ? new Date(timestamp) : new Date();
+            
+            messageDiv.innerHTML = `
+                <div class="flex flex-col ${alignClass} ${maxWidth}">
+                    <div class="px-3 py-1.5 rounded-lg ${roleClass}">
+                        <div class="text-xs text-gray-600 mb-1 flex justify-between items-center">
+                            <span>${username}</span>
+                            <span class="text-gray-500 ml-2">${messageTime.toLocaleTimeString()}</span>
+                        </div>
+                        <div class="whitespace-pre-wrap markdown-body">${marked.parse(content)}</div>
+                    </div>
+                </div>
+            `;
+            
+            chatBox.appendChild(messageDiv);
+        }
+
+        async function sendMessage() {
+            const userInput = document.getElementById('user-input');
+            const message = userInput.value.trim();
+            const apiKey = document.getElementById('api-key').value.trim();
+            const username = document.getElementById('username').value.trim();
+            const systemPrompt = document.getElementById('system-prompt').value.trim();
+
+            if (!message || !apiKey || !username) {
+                alert('Please fill in all required fields');
+                return;
+            }
+
+            // Create new conversation if none exists
+            if (!currentConversationId) {
+                currentConversationId = generateUUID();
+            }
+
+            try {
+                userInput.value = '';
+                const currentTime = new Date().toISOString();
+                appendMessage('user', message, currentTime);
+
+                // Create a placeholder for the streaming response
+                const responseDiv = document.createElement('div');
+                const chatBox = document.getElementById('chat-history');
+                chatBox.appendChild(responseDiv);
+
+                const config = {
+                    temperature: parseFloat(document.getElementById('temperature').value),
+                    max_tokens: parseInt(document.getElementById('max-tokens').value),
+                    top_p: parseFloat(document.getElementById('top-p').value),
+                    frequency_penalty: parseFloat(document.getElementById('frequency-penalty').value),
+                    presence_penalty: parseFloat(document.getElementById('presence-penalty').value)
+                };
+
+                let streamedContent = '';
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message,
+                        api_key: apiKey,
+                        system_prompt: systemPrompt,
+                        config,
+                        username,
+                        conversation_id: currentConversationId
+                    })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    const text = decoder.decode(value);
+                    const lines = text.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                if (data.error) {
+                                    throw new Error(data.error);
+                                }
+                                if (data.done) {
+                                    // Replace the placeholder with the complete message
+                                    responseDiv.remove();
+                                    appendMessage('assistant', streamedContent, data.timestamp);
+                                    scrollToBottom();
+                                    break;
+                                } else if (data.content) {
+                                    streamedContent += data.content;
+                                    // Update the placeholder with current content
+                                    responseDiv.innerHTML = `
+                                        <div class="mb-2">
+                                            <div class="flex flex-col mr-auto max-w-[80%]">
+                                                <div class="px-3 py-1.5 rounded-lg bg-gray-100">
+                                                    <div class="text-xs text-gray-600 mb-1 flex justify-between items-center">
+                                                        <span>Assistant</span>
+                                                        <span class="text-gray-500 ml-2">${new Date().toLocaleTimeString()}</span>
+                                                    </div>
+                                                    <div class="whitespace-pre-wrap markdown-body">${marked.parse(streamedContent)}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `;
+                                }
+                            } catch (e) {
+                                console.error('Error parsing SSE message:', e);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error in sendMessage:', error);
+                appendMessage('assistant', 'Error: ' + error.message, new Date().toISOString());
+            }
+        }
+
+        function scrollToBottom() {
+            const chatHistory = document.getElementById('chat-history');
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+        
+        let currentConversationId = null;
+
+        function saveConfiguration() {
+            const username = document.getElementById('username').value;
+            const apiKey = document.getElementById('api-key').value;
+            
+            if (username) {
+                setCookie('username', username, 30);
+            }
+            if (apiKey) {
+                setCookie('apiKey', apiKey, 30);
+            }
+            
+            // Load chat history for the new username
+            loadChatHistory();
+            
+            // Hide config panel
+            const configPanel = document.getElementById('configPanel');
+            const configArrow = document.getElementById('configArrow');
+            const configToggleText = document.getElementById('configToggleText');
+            configPanel.classList.add('hidden');
+            configArrow.classList.remove('rotate-180');
+            configToggleText.textContent = 'Show Config';
+        }
+    </script>
+</body>
+</html>
