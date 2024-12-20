@@ -18,9 +18,10 @@ if os.environ.get('WEBSITE_HOSTNAME'):  # Running on Azure
     db_password = os.environ.get('POSTGRES_PASSWORD')
     db_host = os.environ.get('POSTGRES_HOST')
     db_name = os.environ.get('POSTGRES_DB')
+    db_port = os.environ.get('POSTGRES_PORT', '5432')
     
     # PostgreSQL connection string
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}/{db_name}'
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
 else:  # Local development
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///conversations.db'
 
@@ -34,10 +35,10 @@ class Message(db.Model):
     role = db.Column(db.String(20), nullable=False)  # 'user' or 'assistant'
     conversation_id = db.Column(db.String(50), nullable=False)  # to group messages in same conversation
     username = db.Column(db.String(50), nullable=False)  # to identify the user
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=datetime.now)
 
 with app.app_context():
-    db.create_all()
+    db.create_all() 
 
 @app.route('/')
 def home():
@@ -76,16 +77,13 @@ def chat():
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
 
-        # Get only the last few messages for context (e.g., last 10 messages)
+        # Get all messages for this conversation in chronological order
         conversation_messages = Message.query.filter_by(
             conversation_id=conversation_id, 
             username=username
-        ).order_by(Message.timestamp.desc()).limit(10).all()
+        ).order_by(Message.timestamp.asc()).all()
         
-        # Reverse to get chronological order
-        conversation_messages.reverse()
-        
-        # Add context messages
+        # Add all context messages
         for msg in conversation_messages:
             messages.append({"role": msg.role, "content": msg.content})
 
